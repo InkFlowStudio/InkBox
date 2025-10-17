@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InkBox - Discord Content Uploader</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles based on Discord theme and user's preferred dark aesthetic */
+        :root {
+            --primary-bg: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --input-bg: #202225;
+            --accent-blue: #7289da; /* Discord Blue */
+            --accent-green: #00ff88; /* User's preferred accent green */
+            --text-light: #f0f0f0;
+            --danger: #f87171;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            color: var(--text-light);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+        }
+        input[type="text"], .textarea-output {
+            background-color: var(--input-bg);
+            border: 1px solid #4f545c;
+            color: var(--text-light);
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus, .textarea-output:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+        }
+        .btn {
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .btn-primary {
+            background-color: var(--accent-blue);
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #677bc4;
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            background-color: #4f545c;
+            cursor: not-allowed;
+        }
+        .upload-label {
+            cursor: pointer;
+            border: 2px dashed var(--accent-blue);
+            background-color: var(--input-bg);
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .upload-label:hover {
+            border-color: #f0f0f0;
+            background-color: #272a2e;
+        }
+        .progress-bar {
+            height: 12px;
+            background-color: #4f545c;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--accent-green);
+            transition: width 0.3s;
+        }
+        #messageBox {
+            color: var(--accent-green);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card w-full max-w-2xl p-8 rounded-xl space-y-6">
+        <h1 class="text-4xl font-extrabold text-center text-white border-b border-gray-600 pb-4">
+            <span class="text-white">InkBox</span> <span class="text-[var(--accent-blue)] text-xl font-medium">| Link Conversion Tool</span>
+        </h1>
+
+        <!-- Instructions -->
+        <div class="bg-blue-900/40 text-blue-300 p-4 rounded-lg text-sm border border-blue-700">
+            <p class="font-bold">NOTE:</p>
+            <p>File uploading is currently disabled due to a **security rule error**. Please use the **Link Converter** feature below with a public link (e.g., from Dropbox or Google Drive) to generate your Discord embeds.</p>
+        </div>
+
+
+        <!-- 1. File Upload (Disabled due to security rules) -->
+        <section class="space-y-4 pt-4 border-b border-gray-600 pb-6">
+            <h2 class="text-2xl font-semibold text-red-400">1. File Upload (Non-Functional)</h2>
+            <p class="text-sm text-red-300 bg-red-900/40 p-3 rounded-lg border border-red-700">
+                ⚠️ **BLOCKED:** The upload failed because the Firebase Storage security rules are preventing ALL file writes in this environment.
+            </p>
+            
+            <label for="fileUploadInput" class="upload-label flex flex-col items-center justify-center p-6 rounded-lg shadow-inner opacity-50 cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-[var(--accent-blue)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v1h-3a4 4 0 00-4 4v3.586a1 1 0 01-.707.293l-4-4A1 1 0 008 12.586V16z" />
+                </svg>
+                <span id="fileStatusText" class="text-lg font-medium text-white">Upload is Blocked</span>
+            </label>
+            <input type="file" id="fileUploadInput" class="hidden" accept="video/mp4" disabled>
+
+            <!-- Upload Button and Progress -->
+            <button id="uploadButton" class="btn btn-primary w-full p-3 rounded-lg font-bold text-lg opacity-50" disabled>
+                <span id="uploadButtonText">Upload Disabled: Security Block</span>
+            </button>
+            
+            <div id="progressContainer" class="hidden">
+                <p class="text-sm text-gray-400 mb-1">Upload Progress:</p>
+                <div class="progress-bar">
+                    <div id="progressBarFill" class="progress-fill"></div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 2. Discord Link Converter (New working feature) -->
+        <section class="space-y-4 pt-6">
+            <h2 class="text-2xl font-semibold">2. Discord Link Converter</h2>
+            <p class="text-sm text-gray-400">Paste your public hosting link here. **InkBox will try to convert it for embedding**</p>
+            
+            <input type="text" id="linkConverterInput" placeholder="Paste public video URL here (e.g., https://dropbox.com/myvideo.mp4)"
+                      class="w-full p-3 rounded-lg">
+            
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                <button id="generateRawUrlButton" class="btn btn-primary flex-1 p-3 rounded-lg font-bold text-lg">
+                    Generate Raw URL (Auto-Corrected)
+                </button>
+                <button id="generateMarkdownButton" class="btn btn-primary flex-1 p-3 rounded-lg font-bold text-lg">
+                    Generate Markdown Link
+                </button>
+            </div>
+        </section>
+
+        <!-- 3. Output (Copy & Paste to Discord) -->
+        <section class="space-y-3 pt-4 border-t border-gray-600">
+            <h2 class="text-2xl font-semibold">3. Output (Copy & Paste to Discord)</h2>
+            <textarea id="outputArea" readonly rows="4" placeholder="The converted link will appear here after clicking a 'Generate' button..."
+                      class="textarea-output w-full p-3 rounded-lg resize-none"></textarea>
+
+            <button id="copyButton" class="btn btn-primary w-full p-3 rounded-lg font-bold text-lg" disabled>
+                Copy to Clipboard
+            </button>
+            <p id="messageBox" class="text-center text-sm font-bold h-5 mt-2"></p>
+        </section>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Import v9 Storage SDK
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // --- Global Variables (Provided by Canvas Environment) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- DOM Elements ---
+        const fileUploadInput = document.getElementById('fileUploadInput');
+        const fileStatusText = document.getElementById('fileStatusText');
+        const uploadButton = document.getElementById('uploadButton');
+        const uploadButtonText = document.getElementById('uploadButtonText');
+        const outputArea = document.getElementById('outputArea');
+        const copyButton = document.getElementById('copyButton');
+        const messageBox = document.getElementById('messageBox');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBarFill = document.getElementById('progressBarFill');
+        // Elements for Link Converter
+        const linkConverterInput = document.getElementById('linkConverterInput');
+        const generateRawUrlButton = document.getElementById('generateRawUrlButton');
+        const generateMarkdownButton = document.getElementById('generateMarkdownButton');
+
+        let db, auth, storage;
+        let selectedFile = null;
+        let userId = 'anonymous';
+        let isFirebaseReady = false; 
+
+        // --- Core Functions ---
+
+        /** Displays a temporary message in the message box. */
+        function showMessage(msg, colorClass = 'text-[var(--accent-green)]') {
+            messageBox.textContent = msg;
+            messageBox.className = `text-center text-sm font-bold h-5 mt-2 ${colorClass}`;
+            setTimeout(() => {
+                messageBox.textContent = '';
+                messageBox.className = `text-center text-sm font-bold h-5 mt-2`;
+            }, 5000);
+        }
+
+        /** Initialize Firebase, Auth, Firestore, and Storage */
+        async function initializeFirebase() {
+            try {
+                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("Firebase configuration is missing or empty.");
+                }
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                storage = getStorage(app);
+                
+                // Add debug logging
+                setLogLevel('debug');
+                
+                // Authenticate user
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                userId = auth.currentUser?.uid || crypto.randomUUID();
+                
+                isFirebaseReady = true; 
+
+                // Note: File upload buttons remain disabled due to security rule error
+                uploadButtonText.textContent = "Upload Disabled: Security Block";
+                uploadButton.disabled = true;
+                fileUploadInput.disabled = true;
+
+                showMessage("InkBox is ready, but file upload is blocked. Use the Link Converter!", 'text-red-400');
+                
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                showMessage(`Initialization failed. Check console for details.`, 'text-red-400');
+            }
+        }
+
+        /**
+         * The upload handler is kept here to clearly show why it fails,
+         * but the button is permanently disabled.
+         */
+        async function handleUpload() {
+            showMessage("Upload Failed. Security rules prevent file storage.", 'text-red-400');
+        }
+
+        /** Link Conversion Logic */
+        function convertLink(type) {
+            const originalUrl = linkConverterInput.value.trim();
+            outputArea.value = ''; // Clear previous output
+
+            if (!originalUrl.startsWith('http')) {
+                // Set the placeholder text if no valid link is found
+                outputArea.value = "Please paste a valid public link starting with \"http\" or \"https\" in the Link Converter field.";
+                copyButton.disabled = true;
+                return;
+            }
+
+            let correctedUrl = originalUrl;
+
+            // Attempt basic URL correction for common services (e.g., Dropbox dl=0 to dl=1)
+            try {
+                const urlObj = new URL(originalUrl);
+
+                if (urlObj.hostname.includes('dropbox.com')) {
+                    // Convert Dropbox link to direct download
+                    correctedUrl = originalUrl.replace('dl=0', 'dl=1');
+                    showMessage("Dropbox link corrected for direct embedding!", 'text-blue-400');
+                } else if (urlObj.hostname.includes('drive.google.com') || urlObj.hostname.includes('googlevideo.com')) {
+                    // Google Drive links often require cleaning (though video embedding is tricky/inconsistent)
+                    correctedUrl = originalUrl.split('?')[0];
+                    showMessage("Google Drive link cleaned. Success depends on Google's sharing settings.", 'text-yellow-400');
+                }
+            } catch (e) {
+                console.error("URL parsing error:", e);
+                correctedUrl = originalUrl;
+            }
+
+            if (type === 'raw') {
+                outputArea.value = correctedUrl;
+                showMessage("Raw URL generated and corrected for best embed chance.", 'text-[var(--accent-green)]');
+            } else if (type === 'markdown') {
+                outputArea.value = `[Click to View Content](${correctedUrl})`;
+                showMessage("Markdown link generated and ready to paste.", 'text-[var(--accent-green)]');
+            }
+            
+            copyButton.disabled = false;
+        }
+
+        // --- Event Listeners ---
+
+        // File upload event listener is modified to do nothing but show error
+        fileUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                fileStatusText.textContent = `Selected: ${file.name} - Upload is BLOCKED.`;
+                showMessage("File storage is not allowed due to security rules.", 'text-red-400');
+            }
+            event.target.value = null; // Clear input
+        });
+
+        // Upload button handler (disabled, but kept for clarity)
+        uploadButton.addEventListener('click', handleUpload);
+
+        // Link Converter Handlers
+        generateRawUrlButton.addEventListener('click', () => convertLink('raw'));
+        generateMarkdownButton.addEventListener('click', () => convertLink('markdown'));
+        
+        // Update output/placeholder on input change
+        linkConverterInput.addEventListener('input', () => {
+            if (outputArea.value.startsWith("Please paste a valid public link")) {
+                outputArea.value = "";
+                copyButton.disabled = true;
+            }
+        });
+
+        copyButton.addEventListener('click', () => {
+            const textToCopy = outputArea.value;
+            if (textToCopy && !textToCopy.startsWith("Please paste a valid public link")) {
+                outputArea.select();
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showMessage("Link copied to clipboard! Paste it into Discord!");
+                    } else {
+                        showMessage("Copy failed. Please manually copy the text.", "text-red-400");
+                    }
+                } catch (err) {
+                    showMessage("Copy failed. Please manually copy the text.", "text-red-400");
+                }
+                window.getSelection().removeAllRanges(); // Deselect the text
+            } else {
+                showMessage("Nothing valid to copy.", "text-red-400");
+            }
+        });
+
+        // Initialize on load
+        initializeFirebase();
+
+    </script>
+</body>
+</html>
