@@ -162,13 +162,13 @@
         // Import v9 Storage SDK
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // --- Global Variables (Provided by Canvas Environment) ---
+        // --- Global Variables (Provided by Canvas Environment or User) ---
         
-        // 🚨 CRITICAL: When hosting on GitHub, you MUST replace the content of 'firebaseConfig' 
+        // This configuration is automatically populated when running in the Canvas environment.
+        // If hosting on GitHub, you MUST replace the content of the empty object below 
         // with the actual configuration object from your Firebase Project Settings.
-        const appId = 'default-app-id'; // This ID is primarily for the Canvas environment, but keeping it helps structure the Firestore paths
-        const firebaseConfig = {
-            apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
     authDomain: "inkbox-3729e.firebaseapp.com",
     projectId: "inkbox-3729e",
     storageBucket: "inkbox-3729e.firebasestorage.app",
@@ -176,8 +176,8 @@
     appId: "1:417321462537:web:1246c00f5f9f0705fac1d8",
     measurementId: "G-8M0KS88J2M"
         };
-        // 👆 DO NOT PASTE IT AS A STRING, PASTE THE OBJECT ITSELF 👆
-        const initialAuthToken = null; // No initial token needed for self-hosted anonymous sign-in
+        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId || 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
 
         // --- DOM Elements ---
         const fileUploadInput = document.getElementById('fileUploadInput');
@@ -214,7 +214,7 @@
         /** Initialize Firebase, Auth, Firestore, and Storage */
         async function initializeFirebase() {
             try {
-                // Check if the user has replaced the config placeholder
+                // Check if configuration exists
                 if (!firebaseConfig || !firebaseConfig.projectId || !firebaseConfig.apiKey) {
                     showMessage("ERROR: Firebase Config is missing or incomplete. Please paste your config.", 'text-red-400');
                     // Prevent further execution if config is bad
@@ -233,9 +233,10 @@
                 
                 // Authenticate user
                 if (initialAuthToken) {
+                    // Use custom token provided by the environment
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
-                    // Use anonymous sign-in for self-hosted apps
+                    // Fallback to anonymous sign-in for self-hosted apps
                     await signInAnonymously(auth);
                 }
                 
