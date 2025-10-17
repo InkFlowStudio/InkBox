@@ -62,8 +62,8 @@
             background-color: var(--input-bg);
             transition: border-color 0.2s, background-color 0.2s;
         }
-        .upload-label:hover {
-            border-color: #f0f0f0;
+        .upload-label:hover, .upload-label.drag-over {
+            border-color: var(--accent-green); /* Highlight for drag-over */
             background-color: #272a2e;
         }
         .progress-bar {
@@ -93,7 +93,9 @@
         <!-- Instructions -->
         <div class="bg-blue-900/40 text-blue-300 p-4 rounded-lg text-sm border border-blue-700">
             <p class="font-bold">NOTE:</p>
-            <p>This script is now fully enabled for **Firebase Storage Uploads**. Use the File Upload section below, provided you have correctly set up your Firebase project's security rules.</p>
+            <p>This script is now fully enabled for **Firebase Storage Uploads**. Use the File Upload section below, provided you have correctly set up your Firebase project's security rules.
+            <br><br><span class="text-yellow-300 font-bold">🛠️ GITHUB FIX: If this fails outside the Canvas, you MUST manually paste your Firebase Config object into the script block below (around line 300).</span>
+            </p>
         </div>
 
 
@@ -101,11 +103,11 @@
         <section class="space-y-4 pt-4 border-b border-gray-600 pb-6">
             <h2 class="text-2xl font-semibold">1. File Upload (Ready for GitHub)</h2>
             
-            <label for="fileUploadInput" class="upload-label flex flex-col items-center justify-center p-6 rounded-lg shadow-inner">
+            <label for="fileUploadInput" id="uploadLabel" class="upload-label flex flex-col items-center justify-center p-6 rounded-lg shadow-inner">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-[var(--accent-blue)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v1h-3a4 4 0 00-4 4v3.586a1 1 0 01-.707.293l-4-4A1 1 0 008 12.586V16z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v1h-3a4 4 0 00-4 4v3.586a1 1 0 01-.707.293l-4-4A1 1 1 008 12.586V16z" />
                 </svg>
-                <span id="fileStatusText" class="text-lg font-medium text-white">Choose a video file to upload (.mp4)</span>
+                <span id="fileStatusText" class="text-lg font-medium text-white">Choose a video file or **drag and drop** (.mp4)</span>
             </label>
             <input type="file" id="fileUploadInput" class="hidden" accept="video/mp4">
 
@@ -165,10 +167,10 @@
         // --- Global Variables (Provided by Canvas Environment or User) ---
         
         // This configuration is automatically populated when running in the Canvas environment.
-        // If hosting on GitHub, you MUST replace the content of the empty object below 
+        // 🛠️ GITHUB FIX: If hosting on GitHub, you MUST replace the content of the empty object below 
         // with the actual configuration object from your Firebase Project Settings.
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
+            apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
     authDomain: "inkbox-3729e.firebaseapp.com",
     projectId: "inkbox-3729e",
     storageBucket: "inkbox-3729e.firebasestorage.app",
@@ -189,6 +191,7 @@ apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
         const messageBox = document.getElementById('messageBox');
         const progressContainer = document.getElementById('progressContainer');
         const progressBarFill = document.getElementById('progressBarFill');
+        const uploadLabel = document.getElementById('uploadLabel'); // Added ID for easier drag-drop targeting
         // Elements for Link Converter
         const linkConverterInput = document.getElementById('linkConverterInput');
         const generateRawUrlButton = document.getElementById('generateRawUrlButton');
@@ -216,7 +219,7 @@ apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
             try {
                 // Check if configuration exists
                 if (!firebaseConfig || !firebaseConfig.projectId || !firebaseConfig.apiKey) {
-                    showMessage("ERROR: Firebase Config is missing or incomplete. Please paste your config.", 'text-red-400');
+                    showMessage("ERROR: Firebase Config is missing. Paste it into the script block for GitHub.", 'text-red-400');
                     // Prevent further execution if config is bad
                     uploadButton.disabled = true;
                     fileUploadInput.disabled = true;
@@ -246,6 +249,10 @@ apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
 
                 // Resetting buttons/inputs to be active
                 fileUploadInput.disabled = false;
+                if (selectedFile) {
+                    uploadButton.disabled = false; 
+                    uploadButtonText.textContent = "Start Upload";
+                }
 
                 showMessage("Firebase services ready. Upload is enabled on your instance!", 'text-[var(--accent-green)]');
                 
@@ -399,11 +406,12 @@ apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
             if (file) {
                 selectedFile = file;
                 fileStatusText.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-                uploadButton.disabled = false;
-                uploadButtonText.textContent = "Start Upload";
+                // Check readiness here again just in case drag/drop pre-selected a file before firebase init
+                uploadButton.disabled = !isFirebaseReady; 
+                uploadButtonText.textContent = isFirebaseReady ? "Start Upload" : "Initializing...";
             } else {
                 selectedFile = null;
-                fileStatusText.textContent = "Choose a video file to upload (.mp4)";
+                fileStatusText.textContent = "Choose a video file or **drag and drop** (.mp4)";
                 uploadButton.disabled = true;
                 uploadButtonText.textContent = "Upload Blocked (No File)";
             }
@@ -444,6 +452,41 @@ apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
                 showMessage("Nothing valid to copy.", "text-red-400");
             }
         });
+
+        // --- Drag-and-Drop functionality ---
+        uploadLabel.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadLabel.classList.add('drag-over');
+        });
+
+        uploadLabel.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadLabel.classList.remove('drag-over');
+        });
+
+        uploadLabel.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadLabel.classList.remove('drag-over');
+            
+            if (e.dataTransfer.files.length > 0) {
+                const droppedFile = e.dataTransfer.files[0];
+                
+                // Check if file is MP4
+                if (droppedFile.type !== 'video/mp4') {
+                    showMessage("Only .mp4 video files can be dropped here.", 'text-red-400');
+                    return;
+                }
+
+                // Simulate file selection by assigning files to the input element and triggering 'change'
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(droppedFile);
+                fileUploadInput.files = dataTransfer.files;
+
+                // Trigger the change event to run the normal selection/validation logic
+                fileUploadInput.dispatchEvent(new Event('change'));
+            }
+        });
+        // ---------------------------------
 
         // Initialize on load
         initializeFirebase();
