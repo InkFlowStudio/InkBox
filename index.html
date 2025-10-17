@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InkBox - Simple File Publisher</title>
+    <title>InkBox - Discord Content Uploader</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -32,13 +32,13 @@
             color: var(--text-light);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
         }
-        .textarea-output {
+        input[type="text"], .textarea-output {
             background-color: var(--input-bg);
             border: 1px solid #4f545c;
             color: var(--text-light);
             transition: border-color 0.2s;
         }
-        .textarea-output:focus {
+        input[type="text"]:focus, .textarea-output:focus {
             border-color: var(--accent-blue);
             outline: none;
         }
@@ -81,38 +81,59 @@
         #messageBox {
             color: var(--accent-green);
         }
+        .btn-gemini {
+             background-color: var(--accent-green);
+             color: var(--primary-bg);
+        }
+        .btn-gemini:hover:not(:disabled) {
+             background-color: #00e57a;
+             transform: translateY(-1px);
+        }
     </style>
 </head>
 <body>
 
     <div class="card w-full max-w-2xl p-8 rounded-xl space-y-6">
         <h1 class="text-4xl font-extrabold text-center text-white border-b border-gray-600 pb-4">
-            <span class="text-white">InkBox</span> <span class="text-[var(--accent-blue)] text-xl font-medium">| File Publisher</span>
+            <span class="text-white">InkBox</span> <span class="text-[var(--accent-blue)] text-xl font-medium">| Link Conversion Tool</span>
         </h1>
 
-        <!-- Instructions -->
-        <div class="bg-blue-900/40 text-blue-300 p-4 rounded-lg text-sm border border-blue-700">
-            <p class="font-bold">PUBLISHING NOTE:</p>
-            <p>This tool uploads your file to Firebase Storage and immediately provides the public download link, similar to Catbox or Imgur.</p>
-            <p><span class="text-red-400 font-bold">🛠️ CRITICAL GITHUB FIX:</span> If deploying externally, you must paste your Firebase Config into the script to enable uploads.</p>
+        <!-- CRITICAL RULES INSTRUCTION (Kept for user context) -->
+        <div class="bg-red-900/40 text-red-300 p-4 rounded-lg text-sm border border-red-700">
+            <p class="font-bold text-lg">⚠️ ACTION REQUIRED: STORAGE PERMISSION DENIED (403)</p>
+            <p class="mb-2">This error means you have **NOT** applied the correct security rules yet. You must **COPY** the following rules, **PASTE** them into your **Firebase Console &gt; Storage &gt; Rules** tab, and then **PUBLISH** them to allow the application to upload files under your user ID:</p>
+            <pre class="bg-gray-800 p-2 mt-2 rounded-md whitespace-pre-wrap text-xs">
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /artifacts/{appId}/users/{userId}/videos/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if true;
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}</pre>
         </div>
+        <!-- End CRITICAL RULES INSTRUCTION -->
 
 
-        <!-- 1. File Upload Section -->
+        <!-- 1. File Upload (Now Functional for your GitHub project) -->
         <section class="space-y-4 pt-4 border-b border-gray-600 pb-6">
-            <h2 class="text-2xl font-semibold">1. Choose File to Publish (.mp4)</h2>
+            <h2 class="text-2xl font-semibold">1. File Upload (Ready for GitHub)</h2>
             
-            <label for="fileUploadInput" id="uploadLabel" class="upload-label flex flex-col items-center justify-center p-8 rounded-lg shadow-inner">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-[var(--accent-blue)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <label for="fileUploadInput" id="uploadLabel" class="upload-label flex flex-col items-center justify-center p-6 rounded-lg shadow-inner">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-[var(--accent-blue)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v1h-3a4 4 0 00-4 4v3.586a1 1 1 00-.707.293l-4-4A1 1 1 008 12.586V16z" />
                 </svg>
-                <span id="fileStatusText" class="text-xl font-medium text-white">Choose or **Drag & Drop** your MP4 file here</span>
+                <span id="fileStatusText" class="text-lg font-medium text-white">Choose a video file or **drag and drop** (.mp4)</span>
             </label>
             <input type="file" id="fileUploadInput" class="hidden" accept="video/mp4">
 
             <!-- Upload Button and Progress -->
-            <button id="uploadButton" class="btn btn-primary w-full p-4 rounded-lg font-extrabold text-xl" disabled>
-                <span id="uploadButtonText">Select an MP4 file first</span>
+            <button id="uploadButton" class="btn btn-primary w-full p-3 rounded-lg font-bold text-lg" disabled>
+                <span id="uploadButtonText">Upload Blocked (No File)</span>
             </button>
             
             <div id="progressContainer" class="hidden">
@@ -124,14 +145,43 @@
         </section>
 
 
-        <!-- 2. Output Link -->
+        <!-- 2. Discord Link Converter & Gemini Feature -->
+        <section class="space-y-4 pt-6">
+            <h2 class="text-2xl font-semibold">2. Discord Link Converter</h2>
+            <p class="text-sm text-gray-400">Paste your public hosting link here. **InkBox will try to convert it for embedding**</p>
+            
+            <input type="text" id="linkConverterInput" placeholder="Paste public video URL here (e.g., https://dropbox.com/myvideo.mp4)"
+                      class="w-full p-3 rounded-lg">
+            
+            <!-- NEW INPUT FOR LLM CONTEXT -->
+            <input type="text" id="contentTitleInput" placeholder="Optional: Give your content a catchy title for the announcement"
+                      class="w-full p-3 rounded-lg">
+            <!-- END NEW INPUT -->
+
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                <button id="generateRawUrlButton" class="btn btn-primary flex-1 p-3 rounded-lg font-bold text-lg">
+                    Generate Raw URL (Auto-Corrected)
+                </button>
+                <button id="generateMarkdownButton" class="btn btn-primary flex-1 p-3 rounded-lg font-bold text-lg">
+                    Generate Markdown Link
+                </button>
+            </div>
+            
+            <!-- NEW GEMINI BUTTON -->
+            <button id="generateDiscordPostButton" class="btn btn-gemini w-full p-3 rounded-lg font-bold text-lg mt-4">
+                Generate Discord Post ✨ (for link in Output)
+            </button>
+            <!-- END NEW GEMINI BUTTON -->
+        </section>
+
+        <!-- 3. Output (Copy & Paste to Discord) -->
         <section class="space-y-3 pt-4 border-t border-gray-600">
-            <h2 class="text-2xl font-semibold">2. Published Link (Ready to Copy)</h2>
-            <textarea id="outputArea" readonly rows="3" placeholder="Your public download link will appear here after a successful upload..."
+            <h2 class="text-2xl font-semibold">3. Output (Copy & Paste to Discord)</h2>
+            <textarea id="outputArea" readonly rows="4" placeholder="The converted link will appear here after clicking a 'Generate' button..."
                       class="textarea-output w-full p-3 rounded-lg resize-none"></textarea>
 
             <button id="copyButton" class="btn btn-primary w-full p-3 rounded-lg font-bold text-lg" disabled>
-                Copy Public Link to Clipboard
+                Copy to Clipboard
             </button>
             <p id="messageBox" class="text-center text-sm font-bold h-5 mt-2"></p>
         </section>
@@ -142,21 +192,31 @@
         import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Import v9 Storage SDK
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // --- Firebase Configuration ---
-        // 🛠️ GITHUB FIX: Replace the empty object below with your actual Firebase Configuration object
-        // when deploying outside of this Canvas environment.
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // --- Global Variables (Provided by Canvas Environment or User) ---
+        
+        // This configuration is automatically populated when running in the Canvas environment.
+        // 🛠️ GITHUB FIX: If hosting on GitHub, you MUST replace the content of the empty object below 
+        // with the actual configuration object from your Firebase Project Settings.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
+            authDomain: "inkbox-3729e.firebaseapp.com",
+            projectId: "inkbox-3729e",
+            storageBucket: "inkbox-3729e.firebasestorage.app",
+            messagingSenderId: "417321462537",
+            appId: "1:417321462537:web:1246c00f5f9f0705fac1d8",
+            measurementId: "G-8M0KS88J2M"
+        };
         const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId || 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
 
-        // --- State and Services ---
-        let db, auth, storage;
-        let selectedFile = null;
-        let userId = 'anonymous';
-        let isFirebaseReady = false; 
-
+        // --- Gemini API Settings ---
+        const apiKey = ""; // Canvas will provide this key in runtime
+        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        const GEMINI_MAX_RETRIES = 3;
+        
         // --- DOM Elements ---
         const fileUploadInput = document.getElementById('fileUploadInput');
         const fileStatusText = document.getElementById('fileStatusText');
@@ -168,8 +228,21 @@
         const progressContainer = document.getElementById('progressContainer');
         const progressBarFill = document.getElementById('progressBarFill');
         const uploadLabel = document.getElementById('uploadLabel');
+        // Elements for Link Converter
+        const linkConverterInput = document.getElementById('linkConverterInput');
+        const generateRawUrlButton = document.getElementById('generateRawUrlButton');
+        const generateMarkdownButton = document.getElementById('generateMarkdownButton');
+        // NEW Gemini Element
+        const contentTitleInput = document.getElementById('contentTitleInput');
+        const generateDiscordPostButton = document.getElementById('generateDiscordPostButton');
 
-        // --- Utility Functions ---
+
+        let db, auth, storage;
+        let selectedFile = null;
+        let userId = 'anonymous';
+        let isFirebaseReady = false; 
+
+        // --- Core Functions ---
 
         /** Displays a temporary message in the message box. */
         function showMessage(msg, colorClass = 'text-[var(--accent-green)]') {
@@ -178,19 +251,18 @@
             setTimeout(() => {
                 messageBox.textContent = '';
                 messageBox.className = `text-center text-sm font-bold h-5 mt-2`;
-            }, 6000); // Keep messages up slightly longer for clarity
+            }, 5000);
         }
 
         /** Initialize Firebase, Auth, Firestore, and Storage */
         async function initializeFirebase() {
             try {
-                // Check if configuration exists and is not empty
-                if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.projectId || !firebaseConfig.apiKey) {
-                    const errorMsg = "CRITICAL: Firebase Config is missing or empty. Cannot initialize services.";
-                    showMessage(errorMsg, 'text-red-400');
+                // Check if configuration exists
+                if (!firebaseConfig || !firebaseConfig.projectId || !firebaseConfig.apiKey) {
+                    showMessage("ERROR: Firebase Config is missing. Paste it into the script block for GitHub.", 'text-red-400');
+                    // Prevent further execution if config is bad
                     uploadButton.disabled = true;
                     fileUploadInput.disabled = true;
-                    outputArea.placeholder = "CRITICAL ERROR: Please paste your Firebase Config into the script block to enable uploads.";
                     return; 
                 }
                 
@@ -199,56 +271,162 @@
                 db = getFirestore(app);
                 storage = getStorage(app);
                 
+                // Add debug logging
                 setLogLevel('debug');
                 
+                // Authenticate user
                 if (initialAuthToken) {
+                    // Use custom token provided by the environment
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
+                    // Fallback to anonymous sign-in for self-hosted apps
                     await signInAnonymously(auth);
                 }
                 
-                userId = auth.currentUser?.uid || crypto.randomUUID();
+                // CRITICAL: Ensure userId is set AFTER authentication completes
+                userId = auth.currentUser?.uid || crypto.randomUUID(); 
+                
                 isFirebaseReady = true; 
 
-                // Update UI state based on readiness and file selection
+                // Resetting buttons/inputs to be active
+                fileUploadInput.disabled = false;
                 if (selectedFile) {
-                    uploadButton.disabled = false;
+                    uploadButton.disabled = false; 
                     uploadButtonText.textContent = "Start Upload";
-                } else {
-                    uploadButtonText.textContent = "Select an MP4 file first";
                 }
 
-                showMessage("Aura says: Publishing services are ready.", 'text-[var(--accent-green)]');
+                showMessage("Firebase services ready. Upload is enabled on your instance!", 'text-[var(--accent-green)]');
                 
             } catch (error) {
                 console.error("Firebase Initialization Error:", error);
+                // Keep the button disabled if init fails
                 uploadButton.disabled = true;
                 fileUploadInput.disabled = true;
-                showMessage(`Initialization failed. Check console.`, 'text-red-400');
+                showMessage(`Initialization failed. Check console for details.`, 'text-red-400');
             }
         }
 
-        /** Handles file upload to Firebase Storage and generates the public link. */
+        /**
+         * Utility to make a fetch call with exponential backoff for Gemini API.
+         */
+        async function fetchWithBackoff(url, options, retries = 0) {
+            try {
+                const response = await fetch(url, options);
+                if (response.status === 429 && retries < GEMINI_MAX_RETRIES) {
+                    const delay = Math.pow(2, retries) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithBackoff(url, options, retries + 1);
+                }
+                if (!response.ok) {
+                     throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+                }
+                return response;
+            } catch (error) {
+                if (retries < GEMINI_MAX_RETRIES) {
+                    const delay = Math.pow(2, retries) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithBackoff(url, options, retries + 1);
+                }
+                throw new Error(`Fetch failed after ${GEMINI_MAX_RETRIES} attempts: ${error.message}`);
+            }
+        }
+
+
+        /**
+         * Generates a creative Discord post summary using the Gemini API (Structured JSON output).
+         */
+        async function generateDiscordPost() {
+            const videoUrl = outputArea.value.trim();
+            const videoTitle = contentTitleInput.value.trim() || 'a new and exciting video clip';
+            
+            if (!videoUrl || videoUrl.startsWith("Please paste a valid public link")) {
+                showMessage("Please generate a raw URL first, or ensure the Output area has a link.", 'text-red-400');
+                return;
+            }
+            
+            generateDiscordPostButton.disabled = true;
+            generateDiscordPostButton.textContent = "Generating Description...";
+
+            const systemPrompt = `You are 'InkBot', a hyper-enthusiastic Discord announcement bot. Your goal is to write a catchy, engaging, and slightly over-the-top post to accompany a video link on a community Discord server. You MUST provide the response in a JSON object that adheres exactly to the required schema. Do not include any text outside the JSON block.`;
+
+            const userQuery = `Generate an announcement post for a video link. The video content is described by the title: "${videoTitle}". Make sure the description is exciting and suitable for a Discord channel.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "title": { "type": "STRING", "description": "A short, catchy, all-caps title for the video link, e.g., 'CLIP OF THE WEEK!'" },
+                            "description": { "type": "STRING", "description": "An exciting, two-sentence description or call-to-action for the video, using emojis." },
+                            "hashtags": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 relevant and funny hashtags for Discord." }
+                        },
+                        required: ["title", "description", "hashtags"]
+                    }
+                }
+            };
+            
+            try {
+                const response = await fetchWithBackoff(geminiApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!jsonText) {
+                     throw new Error("Gemini returned an empty or malformed JSON response.");
+                }
+                
+                const parsedJson = JSON.parse(jsonText);
+                
+                // Format the final Discord message
+                // The link must be on its own line for Discord's embed generation to trigger correctly.
+                const formattedMessage = `**${parsedJson.title}**\n\n${parsedJson.description}\n\n${videoUrl}\n\n${parsedJson.hashtags.map(tag => `#${tag}`).join(' ')}`;
+
+                outputArea.value = formattedMessage;
+                showMessage("✨ Discord post generated by Gemini!", 'text-[var(--accent-green)]');
+                copyButton.disabled = false;
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                showMessage(`Error generating post: ${error.message}. Try again!`, 'text-red-400');
+            } finally {
+                generateDiscordPostButton.disabled = false;
+                generateDiscordPostButton.textContent = "Generate Discord Post ✨ (for link in Output)";
+            }
+        }
+
+
+        /**
+         * Handles file upload to Firebase Storage (RE-ENABLED for GitHub use).
+         */
         async function handleUpload() {
-            if (!selectedFile || !isFirebaseReady) {
-                showMessage("File or services not ready.", 'text-red-400');
+            // Check readiness again, specifically checking for a valid userId
+            if (!selectedFile || !isFirebaseReady || userId === 'anonymous') {
+                showMessage("Upload services not fully ready. Try refreshing.", 'text-red-400');
                 return;
             }
 
             uploadButton.disabled = true;
-            uploadButtonText.textContent = "Preparing Upload...";
-            outputArea.value = '';
-            copyButton.disabled = true;
+            uploadButtonText.textContent = "Uploading...";
             progressContainer.classList.remove('hidden');
 
             const fileName = selectedFile.name;
             const fileExtension = fileName.split('.').pop();
-            // Create a unique file name to prevent clashes
             const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
             
             // Storage Path: artifacts/{appId}/users/{userId}/videos/
             const storagePath = `artifacts/${appId}/users/${userId}/videos/${uniqueFileName}`; 
             const storageRef = ref(storage, storagePath);
+
+            // Log the path the app is attempting to use for user debugging
+            console.log(`[Upload Debug] User ID: ${userId}`);
+            console.log(`[Upload Debug] Target Storage Path: ${storagePath}`);
 
             const metadata = {
                 contentType: selectedFile.type,
@@ -262,93 +440,175 @@
 
             uploadTask.on('state_changed', 
                 (snapshot) => {
-                    // Progress update
+                    // Progress update for UI
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     progressBarFill.style.width = progress + '%';
                     uploadButtonText.textContent = `Uploading... ${Math.round(progress)}%`;
                 }, 
                 (error) => {
                     // Error Handling
-                    console.error("Upload Error:", error);
-                    showMessage(`Upload Failed: ${error.code} - Check Storage Rules!`, 'text-red-400');
+                    console.error("Upload Error:", error.message);
+                    
+                    // Specific check for the permission error
+                    if (error.code === 'storage/unauthorized') {
+                        showMessage(`Upload Failed: Storage Permission Denied (403). CHECK FIREBASE STORAGE RULES!`, 'text-red-400');
+                    } else {
+                        showMessage(`Upload Failed: ${error.code}. Try Again.`, 'text-red-400');
+                    }
+
                     uploadButton.disabled = false;
                     uploadButtonText.textContent = "Upload Failed (Try Again)";
                     progressContainer.classList.add('hidden');
                 }, 
                 async () => {
-                    // Success Handling - The Catbox Step!
+                    // Success Handling
                     try {
-                        // 1. Get the public download URL
                         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                         
-                        // 2. Save metadata to Firestore (optional but useful for tracking)
+                        // Save metadata to Firestore (Private to user)
                         const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_content`;
+
                         await addDoc(collection(db, collectionPath), {
                             name: fileName,
                             url: downloadURL,
+                            size: selectedFile.size,
                             timestamp: Date.now(),
+                            storagePath: storagePath,
+                            type: selectedFile.type,
                             userId: userId
                         });
 
-                        // 3. Display the final link and prepare for copy
+                        // Set the final link in the output section
                         outputArea.value = downloadURL;
-                        showMessage("Upload Complete! Public Link Generated and Ready to Copy.", 'text-[var(--accent-green)]');
+                        showMessage("Upload Complete! URL generated and saved to database. Now, try the ✨ Gemini button!", 'text-[var(--accent-green)]');
                         
-                        uploadButtonText.textContent = "Upload Complete!";
-                        copyButton.disabled = false;
+                        // Set the title input to the file name
+                        contentTitleInput.value = fileName.split('.').slice(0, -1).join('.');
 
-                        // 4. Reset selection but keep service ready
+                        uploadButtonText.textContent = "File Uploaded Successfully!";
+                        // Reset file input state for new upload
                         fileUploadInput.value = null; 
                         selectedFile = null;
                         
+                        // Enable copy button
+                        copyButton.disabled = false;
                         progressContainer.classList.add('hidden');
 
                     } catch (e) {
-                        console.error("Failed to process link or save record:", e);
+                        console.error("Failed to process link or save Firestore record:", e);
                         showMessage("Upload succeeded, but database record failed.", 'text-red-400');
+                        // Still display the URL even if DB failed
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        outputArea.value = downloadURL;
+                        copyButton.disabled = false;
                     }
                 }
             );
         }
 
-        // --- Event Listeners ---
+        /** Link Conversion Logic */
+        function convertLink(type) {
+            const originalUrl = linkConverterInput.value.trim();
+            outputArea.value = ''; // Clear previous output
 
-        // File selection handler
+            if (!originalUrl.startsWith('http')) {
+                // Set the placeholder text if no valid link is found
+                outputArea.value = "Please paste a valid public link starting with \"http\" or \"https\" in the Link Converter field.";
+                copyButton.disabled = true;
+                return;
+            }
+
+            let correctedUrl = originalUrl;
+
+            // Attempt basic URL correction for common services (e.g., Dropbox dl=0 to dl=1)
+            try {
+                const urlObj = new URL(originalUrl);
+
+                if (urlObj.hostname.includes('dropbox.com')) {
+                    // Convert Dropbox link to direct download
+                    correctedUrl = originalUrl.replace('dl=0', 'dl=1');
+                    showMessage("Dropbox link corrected for direct embedding!", 'text-blue-400');
+                } else if (urlObj.hostname.includes('drive.google.com') || urlObj.hostname.includes('googlevideo.com')) {
+                    // Google Drive links often require cleaning (though video embedding is tricky/inconsistent)
+                    correctedUrl = originalUrl.split('?')[0];
+                    showMessage("Google Drive link cleaned. Success depends on Google's sharing settings.", 'text-yellow-400');
+                }
+            } catch (e) {
+                console.error("URL parsing error:", e);
+                correctedUrl = originalUrl;
+            }
+
+            if (type === 'raw') {
+                outputArea.value = correctedUrl;
+                showMessage("Raw URL generated and corrected for best embed chance. Now, try the ✨ Gemini button!", 'text-[var(--accent-green)]');
+            } else if (type === 'markdown') {
+                outputArea.value = `[Click to View Content](${correctedUrl})`;
+                showMessage("Markdown link generated and ready to paste.", 'text-[var(--accent-green)]');
+            }
+            
+            copyButton.disabled = false;
+        }
+
+        // --- Event Listeners ---
+        
+        // Make output area auto-select text on click/focus for easy copying
+        outputArea.addEventListener('focus', (event) => {
+            event.target.select();
+        });
+
+        // File upload event listener now prepares the file for upload
         fileUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
-            if (file && file.type === 'video/mp4') {
+            if (file) {
                 selectedFile = file;
                 fileStatusText.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                // Check readiness here again just in case drag/drop pre-selected a file before firebase init
                 uploadButton.disabled = !isFirebaseReady; 
                 uploadButtonText.textContent = isFirebaseReady ? "Start Upload" : "Initializing...";
             } else {
                 selectedFile = null;
-                fileUploadInput.value = null;
-                fileStatusText.textContent = "Only MP4 files allowed. Please select again.";
+                fileStatusText.textContent = "Choose a video file or **drag and drop** (.mp4)";
                 uploadButton.disabled = true;
-                uploadButtonText.textContent = "Select an MP4 file first";
-                if (file) showMessage("Error: Only MP4 files are supported.", 'text-red-400');
+                uploadButtonText.textContent = "Upload Blocked (No File)";
             }
         });
 
-        // Upload button handler
+        // Upload button handler (now functional)
         uploadButton.addEventListener('click', handleUpload);
 
-        // Copy link handler
+        // Link Converter Handlers
+        generateRawUrlButton.addEventListener('click', () => convertLink('raw'));
+        generateMarkdownButton.addEventListener('click', () => convertLink('markdown'));
+        
+        // NEW Gemini Handler
+        generateDiscordPostButton.addEventListener('click', generateDiscordPost);
+        
+        // Update output/placeholder on input change
+        linkConverterInput.addEventListener('input', () => {
+            if (outputArea.value.startsWith("Please paste a valid public link")) {
+                outputArea.value = "";
+                copyButton.disabled = true;
+            }
+        });
+
         copyButton.addEventListener('click', () => {
             const textToCopy = outputArea.value;
-            if (textToCopy) {
+            if (textToCopy && !textToCopy.startsWith("Please paste a valid public link")) {
                 outputArea.select();
                 try {
                     // Use document.execCommand('copy') for better iFrame compatibility
-                    document.execCommand('copy'); 
-                    showMessage("Link copied to clipboard! Paste it anywhere!");
+                    const successful = document.execCommand('copy'); 
+                    if (successful) {
+                        showMessage("Link copied to clipboard! Paste it into Discord!");
+                    } else {
+                        showMessage("Copy failed. Please manually copy the text.", "text-red-400");
+                    }
                 } catch (err) {
                     showMessage("Copy failed. Please manually copy the text.", "text-red-400");
                 }
                 window.getSelection().removeAllRanges(); // Deselect the text
             } else {
-                showMessage("Nothing to copy yet. Upload a file first.", "text-red-400");
+                showMessage("Nothing valid to copy.", "text-red-400");
             }
         });
 
@@ -376,7 +636,7 @@
                     return;
                 }
 
-                // Simulate file selection
+                // Simulate file selection by assigning files to the input element and triggering 'change'
                 const dataTransfer = new DataTransfer();
                 dataTransfer.items.add(droppedFile);
                 fileUploadInput.files = dataTransfer.files;
