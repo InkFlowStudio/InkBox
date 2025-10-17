@@ -93,28 +93,25 @@
         <!-- Instructions -->
         <div class="bg-blue-900/40 text-blue-300 p-4 rounded-lg text-sm border border-blue-700">
             <p class="font-bold">NOTE:</p>
-            <p>File uploading is currently disabled due to a **security rule error**. Please use the **Link Converter** feature below with a public link (e.g., from Dropbox or Google Drive) to generate your Discord embeds.</p>
+            <p>This script is now fully enabled for **Firebase Storage Uploads**. Use the File Upload section below, provided you have correctly set up your Firebase project's security rules.</p>
         </div>
 
 
-        <!-- 1. File Upload (Disabled due to security rules) -->
+        <!-- 1. File Upload (Now Functional for your GitHub project) -->
         <section class="space-y-4 pt-4 border-b border-gray-600 pb-6">
-            <h2 class="text-2xl font-semibold text-red-400">1. File Upload (Non-Functional)</h2>
-            <p class="text-sm text-red-300 bg-red-900/40 p-3 rounded-lg border border-red-700">
-                ⚠️ **BLOCKED:** The upload failed because the Firebase Storage security rules are preventing ALL file writes in this environment.
-            </p>
+            <h2 class="text-2xl font-semibold">1. File Upload (Ready for GitHub)</h2>
             
-            <label for="fileUploadInput" class="upload-label flex flex-col items-center justify-center p-6 rounded-lg shadow-inner opacity-50 cursor-not-allowed">
+            <label for="fileUploadInput" class="upload-label flex flex-col items-center justify-center p-6 rounded-lg shadow-inner">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-[var(--accent-blue)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v1h-3a4 4 0 00-4 4v3.586a1 1 0 01-.707.293l-4-4A1 1 0 008 12.586V16z" />
                 </svg>
-                <span id="fileStatusText" class="text-lg font-medium text-white">Upload is Blocked</span>
+                <span id="fileStatusText" class="text-lg font-medium text-white">Choose a video file to upload (.mp4)</span>
             </label>
-            <input type="file" id="fileUploadInput" class="hidden" accept="video/mp4" disabled>
+            <input type="file" id="fileUploadInput" class="hidden" accept="video/mp4">
 
             <!-- Upload Button and Progress -->
-            <button id="uploadButton" class="btn btn-primary w-full p-3 rounded-lg font-bold text-lg opacity-50" disabled>
-                <span id="uploadButtonText">Upload Disabled: Security Block</span>
+            <button id="uploadButton" class="btn btn-primary w-full p-3 rounded-lg font-bold text-lg" disabled>
+                <span id="uploadButtonText">Upload Blocked (No File)</span>
             </button>
             
             <div id="progressContainer" class="hidden">
@@ -166,9 +163,21 @@
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- Global Variables (Provided by Canvas Environment) ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // 🚨 CRITICAL: When hosting on GitHub, you MUST replace the content of 'firebaseConfig' 
+        // with the actual configuration object from your Firebase Project Settings.
+        const appId = 'default-app-id'; // This ID is primarily for the Canvas environment, but keeping it helps structure the Firestore paths
+        const firebaseConfig = {
+           apiKey: "AIzaSyBo28MfYhKg-oP2bvSEk5gKp_iJmi276xs",
+    authDomain: "inkbox-3729e.firebaseapp.com",
+    projectId: "inkbox-3729e",
+    storageBucket: "inkbox-3729e.firebasestorage.app",
+    messagingSenderId: "417321462537",
+    appId: "1:417321462537:web:1246c00f5f9f0705fac1d8",
+    measurementId: "G-8M0KS88J2M"
+        };
+        // 👆 DO NOT PASTE IT AS A STRING, PASTE THE OBJECT ITSELF 👆
+        const initialAuthToken = null; // No initial token needed for self-hosted anonymous sign-in
 
         // --- DOM Elements ---
         const fileUploadInput = document.getElementById('fileUploadInput');
@@ -205,9 +214,15 @@
         /** Initialize Firebase, Auth, Firestore, and Storage */
         async function initializeFirebase() {
             try {
-                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                    throw new Error("Firebase configuration is missing or empty.");
+                // Check if the user has replaced the config placeholder
+                if (!firebaseConfig || !firebaseConfig.projectId || !firebaseConfig.apiKey) {
+                    showMessage("ERROR: Firebase Config is missing or incomplete. Please paste your config.", 'text-red-400');
+                    // Prevent further execution if config is bad
+                    uploadButton.disabled = true;
+                    fileUploadInput.disabled = true;
+                    return; 
                 }
+                
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -220,6 +235,7 @@
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
+                    // Use anonymous sign-in for self-hosted apps
                     await signInAnonymously(auth);
                 }
                 
@@ -227,25 +243,108 @@
                 
                 isFirebaseReady = true; 
 
-                // Note: File upload buttons remain disabled due to security rule error
-                uploadButtonText.textContent = "Upload Disabled: Security Block";
-                uploadButton.disabled = true;
-                fileUploadInput.disabled = true;
+                // Resetting buttons/inputs to be active
+                fileUploadInput.disabled = false;
 
-                showMessage("InkBox is ready, but file upload is blocked. Use the Link Converter!", 'text-red-400');
+                showMessage("Firebase services ready. Upload is enabled on your instance!", 'text-[var(--accent-green)]');
                 
             } catch (error) {
                 console.error("Firebase Initialization Error:", error);
+                // Keep the button disabled if init fails
+                uploadButton.disabled = true;
+                fileUploadInput.disabled = true;
                 showMessage(`Initialization failed. Check console for details.`, 'text-red-400');
             }
         }
 
         /**
-         * The upload handler is kept here to clearly show why it fails,
-         * but the button is permanently disabled.
+         * Handles file upload to Firebase Storage (RE-ENABLED for GitHub use).
          */
         async function handleUpload() {
-            showMessage("Upload Failed. Security rules prevent file storage.", 'text-red-400');
+            if (!selectedFile || !isFirebaseReady) {
+                showMessage("File or services not ready.", 'text-red-400');
+                return;
+            }
+
+            uploadButton.disabled = true;
+            uploadButtonText.textContent = "Uploading...";
+            progressContainer.classList.remove('hidden');
+
+            const fileName = selectedFile.name;
+            const fileExtension = fileName.split('.').pop();
+            const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
+            
+            // IMPORTANT: This storage path MUST match your Storage security rules
+            // Path structure aligns with your rules: artifacts/{appId}/users/{userId}/videos/
+            const storagePath = `artifacts/${appId}/users/${userId}/videos/${uniqueFileName}`; 
+            const storageRef = ref(storage, storagePath);
+
+            const metadata = {
+                contentType: selectedFile.type,
+                customMetadata: {
+                    'uploadedBy': userId,
+                    'appId': appId
+                }
+            };
+
+            const uploadTask = uploadBytesResumable(storageRef, selectedFile, metadata);
+
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    // Progress update for UI
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    progressBarFill.style.width = progress + '%';
+                    uploadButtonText.textContent = `Uploading... ${Math.round(progress)}%`;
+                }, 
+                (error) => {
+                    // Error Handling
+                    console.error("Upload Error:", error);
+                    showMessage(`Upload Failed: ${error.code} - Check your Storage Rules!`, 'text-red-400');
+                    uploadButton.disabled = false;
+                    uploadButtonText.textContent = "Upload Failed (Try Again)";
+                    progressContainer.classList.add('hidden');
+                }, 
+                async () => {
+                    // Success Handling
+                    try {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        
+                        // Save metadata to Firestore (Private to user)
+                        const collectionPath = `artifacts/${appId}/users/${userId}/uploaded_content`;
+
+                        await addDoc(collection(db, collectionPath), {
+                            name: fileName,
+                            url: downloadURL,
+                            size: selectedFile.size,
+                            timestamp: Date.now(),
+                            storagePath: storagePath,
+                            type: selectedFile.type,
+                            userId: userId
+                        });
+
+                        // Set the final link in the output section
+                        outputArea.value = downloadURL;
+                        showMessage("Upload Complete! URL generated and saved to database.", 'text-[var(--accent-green)]');
+                        
+                        uploadButtonText.textContent = "File Uploaded Successfully!";
+                        // Reset file input state for new upload
+                        fileUploadInput.value = null; 
+                        selectedFile = null;
+                        
+                        // Enable copy button
+                        copyButton.disabled = false;
+                        progressContainer.classList.add('hidden');
+
+                    } catch (e) {
+                        console.error("Failed to process link or save Firestore record:", e);
+                        showMessage("Upload succeeded, but database record failed.", 'text-red-400');
+                        // Still display the URL even if DB failed
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        outputArea.value = downloadURL;
+                        copyButton.disabled = false;
+                    }
+                }
+            );
         }
 
         /** Link Conversion Logic */
@@ -293,17 +392,23 @@
 
         // --- Event Listeners ---
 
-        // File upload event listener is modified to do nothing but show error
+        // File upload event listener now prepares the file for upload
         fileUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) {
-                fileStatusText.textContent = `Selected: ${file.name} - Upload is BLOCKED.`;
-                showMessage("File storage is not allowed due to security rules.", 'text-red-400');
+                selectedFile = file;
+                fileStatusText.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                uploadButton.disabled = false;
+                uploadButtonText.textContent = "Start Upload";
+            } else {
+                selectedFile = null;
+                fileStatusText.textContent = "Choose a video file to upload (.mp4)";
+                uploadButton.disabled = true;
+                uploadButtonText.textContent = "Upload Blocked (No File)";
             }
-            event.target.value = null; // Clear input
         });
 
-        // Upload button handler (disabled, but kept for clarity)
+        // Upload button handler (now functional)
         uploadButton.addEventListener('click', handleUpload);
 
         // Link Converter Handlers
@@ -323,7 +428,8 @@
             if (textToCopy && !textToCopy.startsWith("Please paste a valid public link")) {
                 outputArea.select();
                 try {
-                    const successful = document.execCommand('copy');
+                    // Use document.execCommand('copy') for better iFrame compatibility
+                    const successful = document.execCommand('copy'); 
                     if (successful) {
                         showMessage("Link copied to clipboard! Paste it into Discord!");
                     } else {
